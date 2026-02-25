@@ -1,0 +1,327 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Personal AI Assistant Gateway API",
+    "version": "1.0.0",
+    "description": "WebSocket + JSON-RPC API for Personal AI Assistant"
+  },
+  "servers": [
+    {
+      "url": "ws://localhost:8080",
+      "description": "Local development server"
+    }
+  ],
+  "paths": {},
+  "components": {
+    "schemas": {
+      "JSONRPCRequest": {
+        "type": "object",
+        "required": ["jsonrpc", "method", "id"],
+        "properties": {
+          "jsonrpc": {
+            "type": "string",
+            "enum": ["2.0"]
+          },
+          "id": {
+            "type": "string",
+            "description": "Request identifier"
+          },
+          "method": {
+            "type": "string",
+            "description": "Method name"
+          },
+          "params": {
+            "type": "object"
+          }
+        }
+      },
+      "JSONRPCResponse": {
+        "type": "object",
+        "required": ["jsonrpc", "id"],
+        "properties": {
+          "jsonrpc": {
+            "type": "string",
+            "enum": ["2.0"]
+          },
+          "id": {
+            "type": "string"
+          },
+          "result": {
+            "type": "object"
+          },
+          "error": {
+            "$ref": "#/components/schemas/JSONRPCError"
+          }
+        }
+      },
+      "JSONRPCError": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object"
+          }
+        }
+      },
+      "ChatSendRequest": {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Message text to send"
+          },
+          "session_key": {
+            "type": "string",
+            "description": "Session identifier (optional)"
+          },
+          "context": {
+            "type": "object",
+            "properties": {
+              "channel": {
+                "type": "string"
+              },
+              "user_id": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "ChatSendResponse": {
+        "type": "object",
+        "properties": {
+          "message_id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "session_key": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "tokens_used": {
+            "type": "integer"
+          }
+        }
+      },
+      "ChatHistoryRequest": {
+        "type": "object",
+        "required": ["session_key"],
+        "properties": {
+          "session_key": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 50,
+            "maximum": 100
+          },
+          "before": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ChatHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "session_key": {
+            "type": "string"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "has_more": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["user", "assistant", "system"]
+          },
+          "content": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["ok", "degraded", "error"]
+          },
+          "version": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "uptime_seconds": {
+            "type": "number"
+          }
+        }
+      },
+      "StreamEvent": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["chat.start", "chat.delta", "chat.end", "chat.error"]
+          },
+          "message_id": {
+            "type": "string"
+          },
+          "delta": {
+            "type": "string",
+            "description": "Text delta for chat.delta events"
+          },
+          "error": {
+            "type": "string",
+            "description": "Error message for chat.error events"
+          }
+        }
+      }
+    }
+  },
+  "x-jsonrpc-methods": {
+    "chat.send": {
+      "summary": "Send a message to the agent",
+      "request": {
+        "$ref": "#/components/schemas/ChatSendRequest"
+      },
+      "response": {
+        "$ref": "#/components/schemas/ChatSendResponse"
+      }
+    },
+    "chat.send_stream": {
+      "summary": "Send a message and receive streaming response",
+      "request": {
+        "$ref": "#/components/schemas/ChatSendRequest"
+      },
+      "response": {
+        "type": "stream",
+        "events": {
+          "$ref": "#/components/schemas/StreamEvent"
+        }
+      }
+    },
+    "chat.history": {
+      "summary": "Get chat history for a session",
+      "request": {
+        "$ref": "#/components/schemas/ChatHistoryRequest"
+      },
+      "response": {
+        "$ref": "#/components/schemas/ChatHistoryResponse"
+      }
+    },
+    "session.list": {
+      "summary": "List all sessions",
+      "request": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "default": 20
+          }
+        }
+      },
+      "response": {
+        "type": "object",
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "session_key": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "message_count": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "session.delete": {
+      "summary": "Delete a session",
+      "request": {
+        "type": "object",
+        "required": ["session_key"],
+        "properties": {
+          "session_key": {
+            "type": "string"
+          }
+        }
+      },
+      "response": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "health": {
+      "summary": "Health check (no auth required)",
+      "request": {
+        "type": "object"
+      },
+      "response": {
+        "$ref": "#/components/schemas/HealthResponse"
+      }
+    }
+  },
+  "x-error-codes": {
+    "-32700": "Parse error",
+    "-32600": "Invalid Request",
+    "-32601": "Method not found",
+    "-32602": "Invalid params",
+    "-32603": "Internal error",
+    "-32001": "Unauthorized",
+    "-32002": "Rate limited",
+    "-32003": "Session not found"
+  }
+}
